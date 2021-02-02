@@ -11,6 +11,7 @@
 #include "pico/stdio_usb.h"
 #include "pico/stdio/driver.h"
 #include "pico/binary_info.h"
+#include "pico/bootrom.h"
 #include "hardware/irq.h"
 
 static_assert(PICO_STDIO_USB_LOW_PRIORITY_IRQ > RTC_IRQ, ""); // note RTC_IRQ is currently the last one
@@ -29,6 +30,14 @@ static void low_priority_worker_irq() {
 static int64_t timer_task(__unused alarm_id_t id, __unused void *user_data) {
     irq_set_pending(PICO_STDIO_USB_LOW_PRIORITY_IRQ);
     return PICO_STDIO_USB_TASK_INTERVAL_US;
+}
+
+// Hook the TinyUSB line coding callback and reset to USB mass storage mode
+// on connection at 1200 baud.
+void tud_cdc_line_coding_cb(uint8_t itf, cdc_line_coding_t const* p_line_coding) {
+    if (p_line_coding->bit_rate == 1200) {
+        reset_usb_boot(0, 0);
+    }
 }
 
 static void stdio_usb_out_chars(const char *buf, int length) {
